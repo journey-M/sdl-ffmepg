@@ -29,17 +29,17 @@ int main(int argc , char* argv[]){
 
 	hello = IMG_Load("res/abc.png"); 
 	if(hello == NULL){
-	printf("init  come in-1-- \n");
 		printf("hello 图片不存在 \n");
 		return 0;
 	}
-	SDL_Rect box = {0,0,hello->w /2, hello->h/2};
+	SDL_Rect box = {0,0,hello->w , 400};
 	SDL_Texture *texture = SDL_CreateTextureFromSurface(render ,hello);
 	SDL_RenderCopy(render, texture, NULL, &box);
+	//显示出来
+        SDL_RenderPresent(render);
 
 
-
-	SDL_Delay(2000);
+	SDL_Delay(10000);
 
 	SDL_FreeSurface(hello);
 	SDL_DestroyTexture(texture);
