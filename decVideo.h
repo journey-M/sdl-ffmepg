@@ -1,5 +1,6 @@
 #ifndef __DEC_VIDEO_H__
 #define __DEC_VIDEO_H__
+
 #include<stdint.h>
 #include<libavcodec/avcodec.h>
 int dff_main(char* fileName,

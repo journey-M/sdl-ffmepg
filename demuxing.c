@@ -1,10 +1,16 @@
 #include <libavformat/avformat.h>
 
 #include "video_decode.h"
+#include "audio_decode.h"
+#include "audio_decode.h"
+
 
 static AVPacket packet ;
 
-void demuxing_main(char* filePath, void (*func)(uint8_t*, int , uint8_t*, int ,uint8_t*, int )){
+void demuxing_main(char* filePath, 
+    void (*func)(uint8_t*, int , uint8_t*, int ,uint8_t*, int ),
+    void (*audio_config)(),
+    void (*audio_palydata)(uint8_t * , int)){
 
     AVFormatContext *avInputFormatContext;
     avInputFormatContext = avformat_alloc_context();
@@ -63,7 +69,16 @@ void demuxing_main(char* filePath, void (*func)(uint8_t*, int , uint8_t*, int ,u
         return;
     }
     
-
+    //创建音频解码器
+    AudioDecoder * audioDecoder = malloc(sizeof(AudioDecoder));
+    ret = initAudioDecoder(audioDecoder, avInputFormatContext->streams[audioIndex], audio_palydata);
+    audio_config();
+    if (ret != 0)
+    {
+        printf("AudioDecoder init false ! \n");
+        return;
+    }
+    
 
     int packetNum = 0;
 
@@ -79,13 +94,23 @@ void demuxing_main(char* filePath, void (*func)(uint8_t*, int , uint8_t*, int ,u
             break;
         }
     
+        /**  TODO 
+         *  
+         *  音频和视频需要单独解码，放在同一个线程中会导致 
+         *  同一时刻只能播放音频或者视频
+         *  next:
+         *  1.视频的单独解码
+         *  2.音频的单独解码
+         */
+
         if (packet.stream_index == videoIndex)
         {
             //start decode video
             decode_video(videoDecoder, &packet);
         }else if (packet.stream_index == audioIndex)
         {
-            /* code */
+            //start deoce audio 
+            decode_audio(audioDecoder, &packet);
         }else
         {
             /* code */

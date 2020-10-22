@@ -1,8 +1,8 @@
 CC = gcc -g
 
 
-player: video_decode.o demuxing.o main.o 
-		gcc -g video_decode.o demuxing.o main.o  -o player -lSDL2 -lSDL2_image -lavformat -lavutil -lavcodec -lswscale -lswresample
+player:	audio_decode.o video_decode.o demuxing.o main.o 
+		gcc -g $^  -o player -lSDL2 -lSDL2_image -lavutil -lavformat -lavcodec -lswscale -lswresample
 
 # player: decVideo.o main.o 
 # 		gcc -g decVideo.o  main.o  -o player -lSDL2 -lSDL2_image -lavformat -lavutil -lavcodec -lswscale -lswresample
@@ -18,6 +18,14 @@ demuxing.o:	demuxing.c
 
 video_decode.o: video_decode.c
 	$(CC) -c $^ -lavformat -lavcodec 
+
+audio_decode.o: audio_decode.c
+	$(CC) -c $^ -lavformat -lavcodec -lavutil -lswresample
+
+
+play_audio:	play_audio.c
+	$(CC) -o $@ $^ -lSDL2
+
 
 .PHONY: clean
 clean: 

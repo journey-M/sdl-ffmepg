@@ -1,8 +1,10 @@
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
 #ifndef __video_decode_h__
 
 #define __video_decode_h__
+
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+
 struct __VideoDecode
 {
     /* data */

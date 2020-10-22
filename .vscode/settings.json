@@ -9,6 +9,13 @@
         "string": "c",
         "string_view": "c",
         "ranges": "c",
-        "variant": "c"
+        "variant": "c",
+        "sdl_stdinc.h": "c",
+        "audio_decode.h": "c",
+        "opt.h": "c",
+        "hash_map": "c",
+        "bitset": "c",
+        "chrono": "c",
+        "algorithm": "c"
     }
 }

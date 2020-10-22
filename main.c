@@ -24,15 +24,16 @@ int out_sample_rate = 44100;
 
 /** audio  **/
 void read_audio_data(void *udata, Uint8 *stream, int len){
-	// SDL_memset(stream, 0, len);
-	// if(audio_len == 0){
-	// 	return ;
-	// }	
-	// len = (len > audio_len ? audio_len :len);
+	SDL_memset(stream, 0, len);
+	if(audio_len == 0){
+		return ;
+	}	
+	len = (len > audio_len ? audio_len :len);
 
-	// SDL_MixAudio(stream, audio_pos, len ,SDL_MIX_MAXVOLUME);
-	// audio_pos += len;
-	// audio_len -= len;
+	SDL_MixAudio(stream, audio_pos, len ,SDL_MIX_MAXVOLUME);
+	audio_pos += len;
+	audio_len -= len;
+	
 }
 
 
@@ -45,22 +46,42 @@ void m_render(uint8_t* yplan, int ypitch, uint8_t* uplan, int upitch,uint8_t* vp
 	SDL_RenderPresent(render);
 }
 
-void set_audio_params(int out_channels, AVCodecContext* audo_codec_ctx){
-
+void set_audio_params(){
 	// SDL_AudioSpec spec;
 	// spec.freq = out_sample_rate;
 	// spec.format = AUDIO_S16SYS;
-	// spec.channels = out_channels;
+	// spec.channels = 2;
 	// spec.silence = 0;
 	// spec.samples = out_nb_samples;
 	// spec.callback = read_audio_data;  
-	// spec.userdata = audo_codec_ctx; 
+	// spec.userdata = NULL; 
 
-	// if((SDL_OpenAudio(&spec, NULL)<0)){
-	// 	printf("can`t open audio.  \n");
-	// 	return ;
-	// }
-	// SDL_PauseAudio(0);
+
+    SDL_AudioSpec spec;  
+    spec.freq = 44100;   
+    spec.format = AUDIO_F32;   
+    spec.channels = 1;   
+    spec.silence = 0;   
+    spec.samples = 1024;   
+    spec.callback = read_audio_data;  
+
+
+	if((SDL_OpenAudio(&spec, NULL)<0)){
+		printf("can`t open audio.  \n");
+		return ;
+	}
+	SDL_PauseAudio(0);
+}
+
+void audioDataCallback(uint8_t * pcmBufferData, int len){
+	audio_chunk = pcmBufferData;
+	audio_len = len;
+	audio_pos = audio_chunk;
+
+	SDL_PauseAudio(0);  
+    while(audio_len>0)//Wait until finish  
+        SDL_Delay(1);  
+
 }
 
 int main(int argc , char* argv[]){
@@ -108,11 +129,8 @@ int main(int argc , char* argv[]){
 
 	// dff_main(argv[1], m_render, NULL);
 
-	demuxing_main(argv[1], m_render);
+	demuxing_main(argv[1], m_render, set_audio_params, audioDataCallback);
 
-
-
-	SDL_Delay(5000);
 
 	SDL_FreeSurface(hello);
 	// SDL_DestroyTexture(texture);
