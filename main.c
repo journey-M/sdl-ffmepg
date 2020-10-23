@@ -16,10 +16,7 @@ static int height = 650;
 static SDL_Renderer * render;
 Uint32 audio_len;
 Uint8 *audio_pos;
-int out_buffer_size ;
 uint8_t *audio_chunk;
-int out_nb_samples = 1024;
-int out_sample_rate = 44100;
 
 
 /** audio  **/
@@ -47,16 +44,6 @@ void m_render(uint8_t* yplan, int ypitch, uint8_t* uplan, int upitch,uint8_t* vp
 }
 
 void set_audio_params(){
-	// SDL_AudioSpec spec;
-	// spec.freq = out_sample_rate;
-	// spec.format = AUDIO_S16SYS;
-	// spec.channels = 2;
-	// spec.silence = 0;
-	// spec.samples = out_nb_samples;
-	// spec.callback = read_audio_data;  
-	// spec.userdata = NULL; 
-
-
     SDL_AudioSpec spec;  
     spec.freq = 44100;   
     spec.format = AUDIO_F32;   

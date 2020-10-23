@@ -2,7 +2,7 @@ CC = gcc -g
 
 
 player:	audio_decode.o video_decode.o demuxing.o main.o 
-		gcc -g $^  -o player -lSDL2 -lSDL2_image -lavutil -lavformat -lavcodec -lswscale -lswresample
+		gcc -g $^  -o player -lSDL2 -lSDL2_image -lavutil -lavformat -lavcodec -lswscale -lswresample -lpthread
 
 # player: decVideo.o main.o 
 # 		gcc -g decVideo.o  main.o  -o player -lSDL2 -lSDL2_image -lavformat -lavutil -lavcodec -lswscale -lswresample

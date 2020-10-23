@@ -1,4 +1,6 @@
 #include <libavformat/avformat.h>
+#include <pthread.h>
+#include <unistd.h>
 
 #include "video_decode.h"
 #include "audio_decode.h"
@@ -6,6 +8,34 @@
 
 
 static AVPacket packet ;
+static pthread_t videoThread, audioThread;
+
+
+/** 解码视频的线程
+ */
+static void videoDecoderTh(){
+    while (1)
+    {
+        /* code */
+        printf("video ---- create ---- thread ---\n");
+        sleep(3);
+    }
+    
+}
+
+/** 解码音频的线程
+ */
+static void audioDecoderTh(){
+    while (1)
+    {
+        /* code */
+        printf("audio ---- create ---- thread ---\n");
+        sleep(3);
+
+    }
+    
+}
+
 
 void demuxing_main(char* filePath, 
     void (*func)(uint8_t*, int , uint8_t*, int ,uint8_t*, int ),
@@ -22,6 +52,21 @@ void demuxing_main(char* filePath,
     
 
     int ret;
+    ret = pthread_create(&videoThread, NULL,videoDecoderTh, NULL);
+    if (ret  < 0)
+    {
+        fprintf(stderr, "创建视频线程失败！");
+        return ;
+    }
+
+    ret = pthread_create(&audioThread, NULL,audioDecoderTh, NULL);
+    if (ret  < 0)
+    {
+        fprintf(stderr, "创建音频线程失败！");
+        return ;
+    }
+    
+
 
     ret = avformat_open_input(&avInputFormatContext,filePath,NULL, NULL);
     if (ret<0)
@@ -38,9 +83,7 @@ void demuxing_main(char* filePath,
     }
     
 
-
     int videoIndex, audioIndex;
-    
     av_init_packet(&packet);
     packet.data = NULL;
     packet.size = 0;
