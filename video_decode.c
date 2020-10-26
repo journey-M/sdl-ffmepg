@@ -12,7 +12,7 @@
  * return 0 is success
  **/
 int initVideoDecoder(VideoDecoder *decoder, AVStream * avStream, 
-    void (*func)(uint8_t*, int , uint8_t*, int ,uint8_t*, int )){
+    void (*func)(AVFrame *gotFrame)){
 
     decoder->callback_func = func;        
     decoder->avFrame = av_frame_alloc();
@@ -95,12 +95,9 @@ void decode_video(VideoDecoder *decoder, AVPacket *avPacket){
         if (decoder->callback_func)
         {
             /* code */
-            decoder->callback_func((uint8_t*)avFrame->data[0], avFrame->linesize[0],
-                    (uint8_t*)avFrame->data[1], avFrame->linesize[1],
-                    (uint8_t*)avFrame->data[2], avFrame->linesize[2]);
+            decoder->callback_func(avFrame);
         }
-        
-        
+                
     }
 
 }

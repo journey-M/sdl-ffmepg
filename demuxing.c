@@ -1,15 +1,19 @@
 #include <libavformat/avformat.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include "video_decode.h"
 #include "audio_decode.h"
 #include "audio_decode.h"
-
+#include "queue.h"
 
 static AVPacket packet ;
 static pthread_t videoThread, audioThread;
 
+static void (*host_playvideo)(uint8_t*, int , uint8_t*, int ,uint8_t*, int );
+
+static void (*host_playaudio)(uint8_t * , int);
 
 /** 解码视频的线程
  */
@@ -17,10 +21,22 @@ static void videoDecoderTh(){
     while (1)
     {
         /* code */
-        printf("video ---- create ---- thread ---\n");
-        sleep(3);
+
+        if (getVideoQueueSize()>0)
+        {
+            /* code */
+            VideoData* vData = popFirstVideo();
+            if (vData != NULL)
+            {
+                host_playvideo(vData->frame->data[0], vData->frame->linesize[0], 
+                    vData->frame->data[1], vData->frame->linesize[1], 
+                    vData->frame->data[2], vData->frame->linesize[2]);
+                av_frame_unref(vData->frame);
+                free(vData);
+            }
+
+        }        
     }
-    
 }
 
 /** 解码音频的线程
@@ -29,18 +45,75 @@ static void audioDecoderTh(){
     while (1)
     {
         /* code */
-        printf("audio ---- create ---- thread ---\n");
-        sleep(3);
 
+        if (getAudioQueueSize()> 0)
+        {
+            AudioData* aData = popFirstAudio();
+            if (aData != NULL)
+            {
+                host_playaudio(aData->data, aData->size);
+                free(aData->data);
+                free(aData);
+            }
+ 
+        }
     }
     
 }
 
+static void maudio_palydata(uint8_t * data, int size){
+
+    //应该把数据放到队列里去，  然后在队列里面去解码，读值
+    AudioData* audioData = malloc(sizeof(AudioData));
+    audioData->data = malloc(sizeof(uint8_t) * size);
+    memcpy(audioData->data, data, size);
+    audioData->size = size;
+    audioData->next = NULL;
+
+    putAudioData(audioData);
+
+    // host_playaudio(data, size);
+}
+
+static void mvideo_playdata(AVFrame *avFrame){
+
+    int ret = 0;
+
+    AVFrame *copyFrame = av_frame_alloc();
+    copyFrame->format = avFrame->format;
+    copyFrame->width = avFrame->width;
+    copyFrame->height = avFrame->height;
+    copyFrame->channels = avFrame->channels;
+    copyFrame->channel_layout = avFrame->channel_layout;
+    copyFrame->nb_samples = avFrame->nb_samples;
+    av_frame_get_buffer(copyFrame, 32);
+    ret = av_frame_copy(copyFrame, avFrame);
+    av_frame_copy_props(copyFrame, avFrame);
+    if (ret<0)
+    {
+        fprintf(stderr, "avframe copy error ! \n");
+        return ;
+    }
+    
+    //视频数据放入单独的队列中
+    VideoData* vidoeData = malloc(sizeof(VideoData));
+    vidoeData->frame = copyFrame;
+    vidoeData->next = NULL;
+
+    putVideoData(vidoeData);
+
+    //直接返回播放
+    // host_playvideo(yplan, ypitch,uplan,upitch, vplan,vpitch );   
+}
+
 
 void demuxing_main(char* filePath, 
-    void (*func)(uint8_t*, int , uint8_t*, int ,uint8_t*, int ),
+    void (*video_playdata)(uint8_t*, int , uint8_t*, int ,uint8_t*, int ),
     void (*audio_config)(),
     void (*audio_palydata)(uint8_t * , int)){
+
+    host_playvideo = video_playdata;
+    host_playaudio = audio_palydata;
 
     AVFormatContext *avInputFormatContext;
     avInputFormatContext = avformat_alloc_context();
@@ -49,7 +122,10 @@ void demuxing_main(char* filePath,
         printf("alloc avinputformat error! \n");
         return;
     }
-    
+
+    //初始化视频和音频流
+    initQueueAuduio();
+    initVideoQueue();
 
     int ret;
     ret = pthread_create(&videoThread, NULL,videoDecoderTh, NULL);
@@ -105,7 +181,7 @@ void demuxing_main(char* filePath,
 
     //创建视频解码器
     VideoDecoder * videoDecoder = malloc(sizeof(VideoDecoder));
-    ret = initVideoDecoder(videoDecoder, avInputFormatContext->streams[videoIndex], func);
+    ret = initVideoDecoder(videoDecoder, avInputFormatContext->streams[videoIndex], mvideo_playdata);
     if (ret !=0)
     {
         printf("VideoDecoder init false ! \n");
@@ -114,7 +190,7 @@ void demuxing_main(char* filePath,
     
     //创建音频解码器
     AudioDecoder * audioDecoder = malloc(sizeof(AudioDecoder));
-    ret = initAudioDecoder(audioDecoder, avInputFormatContext->streams[audioIndex], audio_palydata);
+    ret = initAudioDecoder(audioDecoder, avInputFormatContext->streams[audioIndex], maudio_palydata);
     audio_config();
     if (ret != 0)
     {

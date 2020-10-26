@@ -1,7 +1,7 @@
 CC = gcc -g
 
 
-player:	audio_decode.o video_decode.o demuxing.o main.o 
+player:	queue.o	audio_decode.o video_decode.o demuxing.o main.o 
 		gcc -g $^  -o player -lSDL2 -lSDL2_image -lavutil -lavformat -lavcodec -lswscale -lswresample -lpthread
 
 # player: decVideo.o main.o 
@@ -22,6 +22,8 @@ video_decode.o: video_decode.c
 audio_decode.o: audio_decode.c
 	$(CC) -c $^ -lavformat -lavcodec -lavutil -lswresample
 
+queue.o: queue.c
+	$(CC) -c $^ 
 
 play_audio:	play_audio.c
 	$(CC) -o $@ $^ -lSDL2

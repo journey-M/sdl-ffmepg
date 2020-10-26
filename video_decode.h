@@ -12,12 +12,12 @@ struct __VideoDecode
     AVCodec *codec;
     AVFrame *avFrame;
     int initd;
-    void (*callback_func)(uint8_t*, int , uint8_t*, int ,uint8_t*, int );
+    void (*callback_func)(AVFrame *avFrame );
 };
 
 typedef struct __VideoDecode VideoDecoder ;
 
-int initVideoDecoder(VideoDecoder *decoder, AVStream * avStream,void (*func)(uint8_t*, int , uint8_t*, int ,uint8_t*, int ));
+int initVideoDecoder(VideoDecoder *decoder, AVStream * avStream,void (*func)(AVFrame * gotFrame ));
 
 void decode_video(VideoDecoder *decoder, AVPacket * avPacket);
 

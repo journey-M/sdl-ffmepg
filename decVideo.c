@@ -151,7 +151,7 @@ static int decode_packet(int *got_frame, int cached){
 
 			audio_chunk = out_buffer;
 			audio_len = out_buffer_size;
-		  audio_pos = audio_chunk;
+		 	audio_pos = audio_chunk;
 
 
 		}
