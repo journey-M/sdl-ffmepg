@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include "video_decode.h"
 #include "audio_decode.h"
@@ -10,6 +11,10 @@
 
 static AVPacket packet ;
 static pthread_t videoThread, audioThread;
+static AVRational time_base;
+static long lastTime;
+static struct timeval startTime;
+static struct timeval curentTime;
 
 static void (*host_playvideo)(uint8_t*, int , uint8_t*, int ,uint8_t*, int );
 
@@ -28,6 +33,20 @@ static void videoDecoderTh(){
             VideoData* vData = popFirstVideo();
             if (vData != NULL)
             {
+                //当前帧应该在的时间
+                long  vtime = vData->frame->pts * av_q2d(time_base) * 1000000;
+
+                gettimeofday(&curentTime, NULL);
+
+                long timeUse = (curentTime.tv_sec-startTime.tv_sec)*1000000+(curentTime.tv_usec-startTime.tv_usec);
+
+                int delt = vtime - timeUse;
+                if (delt > 0)
+                {
+                    fprintf(stderr, "sleeping ....  \n");
+                    av_usleep(delt);
+                }
+
                 host_playvideo(vData->frame->data[0], vData->frame->linesize[0], 
                     vData->frame->data[1], vData->frame->linesize[1], 
                     vData->frame->data[2], vData->frame->linesize[2]);
@@ -189,6 +208,14 @@ void demuxing_main(char* filePath,
     //创建视频解码器
     VideoDecoder * videoDecoder = malloc(sizeof(VideoDecoder));
     ret = initVideoDecoder(videoDecoder, avInputFormatContext->streams[videoIndex], mvideo_playdata);
+    AVStream * videoStream = avInputFormatContext->streams[videoIndex];
+    fprintf(stderr, "duration %2d \n", videoStream -> duration );
+    fprintf(stderr, "time base : %f \n", av_q2d(videoStream -> time_base) );
+    fprintf(stderr, "avg frame rate : %f \n", av_q2d(videoStream -> r_frame_rate) );
+    fprintf(stderr, "avg frame rate : %f \n", av_q2d(videoStream -> r_frame_rate) );
+    time_base = videoStream->time_base;
+    gettimeofday(&startTime, NULL);
+
     if (ret !=0)
     {
         printf("VideoDecoder init false ! \n");

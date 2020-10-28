@@ -25,6 +25,7 @@
         "unistd.h": "c",
         "pthread.h": "c",
         "stack.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "condition_variable": "c"
     }
 }

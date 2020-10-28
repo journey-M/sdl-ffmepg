@@ -118,6 +118,7 @@ int main(int argc , char* argv[]){
 
 	demuxing_main(argv[1], m_render, set_audio_params, audioDataCallback);
 
+	sleep(10);	
 
 	SDL_FreeSurface(hello);
 	// SDL_DestroyTexture(texture);
