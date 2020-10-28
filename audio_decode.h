@@ -15,7 +15,7 @@ struct __AudioDecode
     int initd;
     SwrContext *swrCtx;
     uint8_t *out_buffer;
-    void (*callback_func)(uint8_t*, int );
+    void (*callback_func)(AVFrame * audioFrame );
 };
 
 typedef struct __AudioDecode AudioDecoder ;
@@ -28,7 +28,7 @@ struct __AudoParams
 typedef struct __AudoParams AudioParmas;
 
 
-int initAudioDecoder(AudioDecoder *decoder, AVStream * avStream,void (*func)(uint8_t*, int ));
+int initAudioDecoder(AudioDecoder *decoder, AVStream * avStream,void (*func)(AVFrame *));
 
 void decode_audio(AudioDecoder *decoder, AVPacket * avPacket);
 

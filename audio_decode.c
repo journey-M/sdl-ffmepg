@@ -41,7 +41,7 @@ static int get_format_from_sample_fmt(const char **fmt,
 }
 
 int initAudioDecoder(AudioDecoder *decoder, AVStream * avStream,
-    void (*audio_callData)(uint8_t*, int )){
+    void (*audio_callData)( AVFrame * avFrame)){
 
     //输出 视频文件
     audio_dst_filename = "./dest.pcm";
@@ -192,8 +192,7 @@ void decode_audio(AudioDecoder *decoder, AVPacket * avPacket){
         //通过回掉，把数据传回sdl 去播放
         
         if(decoder->callback_func){
-            size_t unpadded_linesize = avFrame->nb_samples * av_get_bytes_per_sample(avFrame->format);
-            decoder->callback_func(avFrame->data[0], unpadded_linesize);
+            decoder->callback_func(avFrame);
         }
     
 

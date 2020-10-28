@@ -51,8 +51,10 @@ static void audioDecoderTh(){
             AudioData* aData = popFirstAudio();
             if (aData != NULL)
             {
-                host_playaudio(aData->data, aData->size);
-                free(aData->data);
+                AVFrame * frame = aData->frame;
+                size_t size = frame->nb_samples * av_get_bytes_per_sample(frame->format);
+                host_playaudio(frame->data[0], size);
+                av_frame_unref(frame);
                 free(aData);
             }
  
@@ -61,13 +63,14 @@ static void audioDecoderTh(){
     
 }
 
-static void maudio_palydata(uint8_t * data, int size){
+static void maudio_palydata(AVFrame * avFrame){
 
     //应该把数据放到队列里去，  然后在队列里面去解码，读值
+    AVFrame * audioFrame = av_frame_alloc();
+    av_frame_move_ref(audioFrame, avFrame);
     AudioData* audioData = malloc(sizeof(AudioData));
-    audioData->data = malloc(sizeof(uint8_t) * size);
-    memcpy(audioData->data, data, size);
-    audioData->size = size;
+
+    audioData->frame = audioFrame;
     audioData->next = NULL;
 
     putAudioData(audioData);
@@ -79,16 +82,20 @@ static void mvideo_playdata(AVFrame *avFrame){
 
     int ret = 0;
 
-    AVFrame *copyFrame = av_frame_alloc();
-    copyFrame->format = avFrame->format;
-    copyFrame->width = avFrame->width;
-    copyFrame->height = avFrame->height;
-    copyFrame->channels = avFrame->channels;
-    copyFrame->channel_layout = avFrame->channel_layout;
-    copyFrame->nb_samples = avFrame->nb_samples;
-    av_frame_get_buffer(copyFrame, 32);
-    ret = av_frame_copy(copyFrame, avFrame);
-    av_frame_copy_props(copyFrame, avFrame);
+    AVFrame *copyFrame;
+    copyFrame = av_frame_alloc();
+    // copyFrame->format = avFrame->format;
+    // copyFrame->width = avFrame->width;
+    // copyFrame->height = avFrame->height;
+    // copyFrame->channels = avFrame->channels;
+    // copyFrame->channel_layout = avFrame->channel_layout;
+    // copyFrame->nb_samples = avFrame->nb_samples;
+    // av_frame_get_buffer(copyFrame, 32);
+    // ret = av_frame_copy(copyFrame, avFrame);
+    // av_frame_copy_props(copyFrame, avFrame);
+
+    av_frame_move_ref(copyFrame, avFrame);
+
     if (ret<0)
     {
         fprintf(stderr, "avframe copy error ! \n");

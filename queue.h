@@ -9,8 +9,7 @@
 typedef struct __AudioData
 {
     /* data */
-    uint8_t * data;
-    int size;
+    AVFrame * frame;
 
     struct __AudioData *next;
 } AudioData;
