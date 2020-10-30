@@ -28,6 +28,7 @@
         "stdlib.h": "c",
         "condition_variable": "c",
         "*.def": "c",
-        "*.tcc": "cpp"
+        "*.tcc": "cpp",
+        "avcodec.h": "c"
     }
 }

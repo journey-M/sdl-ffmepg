@@ -4,6 +4,7 @@
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libswscale/swscale.h>
 
 struct __VideoDecode
 {
@@ -11,6 +12,7 @@ struct __VideoDecode
     AVCodecContext  *codecCtx;
     AVCodec *codec;
     AVFrame *avFrame;
+    struct SwsContext *swsContext;
     int initd;
     void (*callback_func)(AVFrame *avFrame );
 };

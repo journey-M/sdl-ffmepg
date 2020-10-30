@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <libswscale/swscale.h>
 
 #include "video_decode.h"
 #include "audio_decode.h"
@@ -25,6 +26,8 @@ static void (*host_playvideo)(uint8_t*, int , uint8_t*, int ,uint8_t*, int );
 
 static void (*host_playaudio)(uint8_t * , int);
 
+struct swsContext* swsContext;
+
 /** 解码视频的线程
  */
 static void videoDecoderTh(){
@@ -41,16 +44,46 @@ static void videoDecoderTh(){
                 //当前帧应该在的时间
                 long  vtime = vData->frame->pts * av_q2d(time_base) * 1000000;
 
+
                 int delt = vtime - audio_frame_time;
                 if (delt > 20)
                 {
                     fprintf(stderr, "sleeping ....\nvtime: %f, \natime: %f   delt = %d  \n",vtime, audio_frame_time,delt);
                     av_usleep(delt);
                 }
+                
+                AVFrame * avFrame = vData->frame;
 
-                host_playvideo(vData->frame->data[0], vData->frame->linesize[0], 
-                    vData->frame->data[1], vData->frame->linesize[1], 
-                    vData->frame->data[2], vData->frame->linesize[2]);
+                if (!swsContext)
+                {
+                    swsContext = sws_getContext(avFrame->width,  avFrame->height, avFrame->format, 
+                                avFrame->width/4, avFrame->height/4, avFrame->format,
+                                SWS_BILINEAR, NULL, NULL, NULL);
+                }
+
+                // uint8_t* pixels[4];
+                // int pitch[4];
+                // if ((av_image_alloc(pixels, pitch, avFrame->width/4, avFrame->height/4,
+                //    avFrame->format, 16)) < 0) {
+                //     fprintf(stderr, "Could not allocate destination image\n");
+                // }
+                AVFrame* destFrame = av_frame_alloc();
+                destFrame->format = vData->frame->format;
+                destFrame->width  = vData->frame->width;
+                destFrame->height = vData->frame->height;
+
+                av_frame_get_buffer(destFrame, 32);
+
+                sws_scale(swsContext , avFrame->data, avFrame->linesize, 0, avFrame->height, 
+                    destFrame->data, destFrame->linesize);
+
+                /* buffer is going to be written to rawvideo file, no alignment */
+
+                host_playvideo(destFrame->data[0], destFrame->linesize[0], 
+                    destFrame->data[1], destFrame->linesize[1], 
+                    destFrame->data[2], destFrame->linesize[2]);
+                
+                av_frame_unref(destFrame);
                 av_frame_unref(vData->frame);
                 free(vData);
             }
