@@ -26,6 +26,8 @@
         "pthread.h": "c",
         "stack.h": "c",
         "stdlib.h": "c",
-        "condition_variable": "c"
+        "condition_variable": "c",
+        "*.def": "c",
+        "*.tcc": "cpp"
     }
 }

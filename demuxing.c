@@ -12,9 +12,14 @@
 static AVPacket packet ;
 static pthread_t videoThread, audioThread;
 static AVRational time_base;
+static AVRational time_base_audio;
 static long lastTime;
-static struct timeval startTime;
-static struct timeval curentTime;
+
+/**
+ * 视频播放剩余的进度
+ */
+
+static double audio_frame_time ;
 
 static void (*host_playvideo)(uint8_t*, int , uint8_t*, int ,uint8_t*, int );
 
@@ -36,14 +41,10 @@ static void videoDecoderTh(){
                 //当前帧应该在的时间
                 long  vtime = vData->frame->pts * av_q2d(time_base) * 1000000;
 
-                gettimeofday(&curentTime, NULL);
-
-                long timeUse = (curentTime.tv_sec-startTime.tv_sec)*1000000+(curentTime.tv_usec-startTime.tv_usec);
-
-                int delt = vtime - timeUse;
-                if (delt > 0)
+                int delt = vtime - audio_frame_time;
+                if (delt > 20)
                 {
-                    fprintf(stderr, "sleeping ....  \n");
+                    fprintf(stderr, "sleeping ....\nvtime: %f, \natime: %f   delt = %d  \n",vtime, audio_frame_time,delt);
                     av_usleep(delt);
                 }
 
@@ -58,6 +59,8 @@ static void videoDecoderTh(){
     }
 }
 
+
+
 /** 解码音频的线程
  */
 static void audioDecoderTh(){
@@ -71,7 +74,10 @@ static void audioDecoderTh(){
             if (aData != NULL)
             {
                 AVFrame * frame = aData->frame;
-                size_t size = frame->nb_samples * av_get_bytes_per_sample(frame->format);
+                audio_frame_time = frame->pts * av_q2d(time_base_audio) * 1000000;
+
+
+                size_t size = frame->nb_samples * av_get_bytes_per_sample(frame->format) * frame->channels;
                 host_playaudio(frame->data[0], size);
                 av_frame_unref(frame);
                 free(aData);
@@ -82,8 +88,10 @@ static void audioDecoderTh(){
     
 }
 
+
 static void maudio_palydata(AVFrame * avFrame){
 
+    // fprintf(stderr, "video - frame  pts : %d  \n" + avFrame->pts);
     //应该把数据放到队列里去，  然后在队列里面去解码，读值
     AVFrame * audioFrame = av_frame_alloc();
     av_frame_move_ref(audioFrame, avFrame);
@@ -98,6 +106,9 @@ static void maudio_palydata(AVFrame * avFrame){
 }
 
 static void mvideo_playdata(AVFrame *avFrame){
+    // fprintf(stderr, "video - frame  pts : %d  \n" + avFrame->pts);
+
+    // avFrame->opaque
 
     int ret = 0;
 
@@ -129,7 +140,7 @@ static void mvideo_playdata(AVFrame *avFrame){
     putVideoData(vidoeData);
 
     //直接返回播放
-    // host_playvideo(yplan, ypitch,uplan,upitch, vplan,vpitch );   
+    // host_playvideo(yplan, ypitch,uplan,upitch, vplan,vpi                currentAudioTime();                currentAudioTime();tch );   
 }
 
 
@@ -214,7 +225,6 @@ void demuxing_main(char* filePath,
     fprintf(stderr, "avg frame rate : %f \n", av_q2d(videoStream -> r_frame_rate) );
     fprintf(stderr, "avg frame rate : %f \n", av_q2d(videoStream -> r_frame_rate) );
     time_base = videoStream->time_base;
-    gettimeofday(&startTime, NULL);
 
     if (ret !=0)
     {
@@ -225,6 +235,7 @@ void demuxing_main(char* filePath,
     //创建音频解码器
     AudioDecoder * audioDecoder = malloc(sizeof(AudioDecoder));
     ret = initAudioDecoder(audioDecoder, avInputFormatContext->streams[audioIndex], maudio_palydata);
+    time_base_audio = avInputFormatContext->streams[audioIndex]->time_base;
     audio_config();
     if (ret != 0)
     {
@@ -240,7 +251,6 @@ void demuxing_main(char* filePath,
         ret = av_read_frame(avInputFormatContext, &packet);
         packetNum ++ ;
 
-        printf("recieved packet Num :  %d \n ", packetNum);
         if (ret != 0)
         {
             printf("av_read_fram to the end \n");
