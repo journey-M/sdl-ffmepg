@@ -67,6 +67,11 @@ VideoData* popFirstVideo(){
     }else
     {
         VideoData* ret = mvideioQueues->first;
+        if (ret == NULL)
+        {
+            return NULL;
+        }
+        
         VideoData* next = ret->next;
         mvideioQueues->first = next;
         mvideioQueues->size = mvideioQueues->size - 1;

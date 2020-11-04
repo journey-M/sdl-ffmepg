@@ -7,6 +7,8 @@
 #include <libavcodec/avcodec.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <pthread.h>
+
 // #include "decVideo.h"
 
 #include "demuxing.h"
@@ -18,6 +20,8 @@ Uint32 audio_len;
 Uint8 *audio_pos;
 uint8_t *audio_chunk;
 
+pthread_t eventTh;
+static int quit = 0 ;
 
 /** audio  **/
 void read_audio_data(void *udata, Uint8 *stream, int len){
@@ -71,6 +75,36 @@ void audioDataCallback(uint8_t * pcmBufferData, int len){
 
 }
 
+
+/**
+ * 关闭解码程序，并清理内存
+ */
+static void closeApp(){
+	quit = 1;
+	closeDemuxing();
+}
+
+static void playover(){
+	closeApp();
+}
+
+static void dispatchKeyEvent(SDL_Event *event){
+
+	if (event->key.keysym.sym == SDLK_RIGHT)
+	{
+		fprintf(stderr, "press key event : ---- %d  right \n");
+
+	}
+	
+}
+
+
+static void demuxingThread(void* path){
+
+	demuxing_main((char*)path, m_render, set_audio_params, audioDataCallback, playover);
+
+}
+
 int main(int argc , char* argv[]){
 
 	SDL_Window *window = NULL;
@@ -83,7 +117,7 @@ int main(int argc , char* argv[]){
 	}
 	
 
-	if(SDL_Init(SDL_INIT_VIDEO)<0){
+	if(SDL_Init(SDL_INIT_VIDEO |SDL_INIT_EVENTS)<0){
 		printf("erro for init  \n");
 		return 0;
 	}
@@ -116,9 +150,38 @@ int main(int argc , char* argv[]){
 
 	// dff_main(argv[1], m_render, NULL);
 
-	demuxing_main(argv[1], m_render, set_audio_params, audioDataCallback);
+	fprintf(stderr, "eventThread : start \n");
+	//创建sdl事件的线程
+	int ret = pthread_create(&eventTh, NULL, &demuxingThread, argv[1]);
+	if (ret < 0 )
+	{
+		/* code */
+		fprintf(stderr, "创建事件线程失败 %d \n",ret);
+		return 0;
+	}
 
-	sleep(5);
+	SDL_Event event;
+
+	while (!quit)
+	{
+		if (SDL_PollEvent(&event))
+		{
+			
+			switch (event.type)
+			{
+			case SDL_KEYDOWN:
+				dispatchKeyEvent(&event);
+				break;		
+			case SDL_QUIT:
+				closeApp();
+				break;
+			default:
+				break;
+			}
+		}
+		usleep(100);
+	}
+
 
 	SDL_FreeSurface(hello);
 	// SDL_DestroyTexture(texture);

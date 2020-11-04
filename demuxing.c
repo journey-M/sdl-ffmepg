@@ -15,6 +15,8 @@ static pthread_t videoThread, audioThread;
 static AVRational time_base;
 static AVRational time_base_audio;
 static long lastTime;
+static int quietDemuxing = 0;
+static int decodeOver = 0;
 
 /**
  * 视频播放剩余的进度
@@ -26,12 +28,14 @@ static void (*host_playvideo)(uint8_t*, int , uint8_t*, int ,uint8_t*, int );
 
 static void (*host_playaudio)(uint8_t * , int);
 
+static void (*playover)();
+
 struct swsContext* swsContext;
 
 /** 解码视频的线程
  */
 static void videoDecoderTh(){
-    while (1)
+    while (!quietDemuxing)
     {
         /* code */
 
@@ -48,7 +52,7 @@ static void videoDecoderTh(){
                 int delt = vtime - audio_frame_time;
                 if (delt > 20)
                 {
-                    fprintf(stderr, "sleeping ....\nvtime: %f, \natime: %f   delt = %d  \n",vtime, audio_frame_time,delt);
+                    // fprintf(stderr, "sleeping ....\nvtime: %f, \natime: %f   delt = %d  \n",vtime, audio_frame_time,delt);
                     av_usleep(delt);
                 }
                 
@@ -97,7 +101,7 @@ static void videoDecoderTh(){
 /** 解码音频的线程
  */
 static void audioDecoderTh(){
-    while (1)
+    while (!quietDemuxing)
     {
         /* code */
 
@@ -116,6 +120,11 @@ static void audioDecoderTh(){
                 free(aData);
             }
  
+        }
+
+        if (decodeOver && getAudioQueueSize() == 0 && playover)
+        {
+            playover();
         }
     }
     
@@ -180,10 +189,12 @@ static void mvideo_playdata(AVFrame *avFrame){
 void demuxing_main(char* filePath, 
     void (*video_playdata)(uint8_t*, int , uint8_t*, int ,uint8_t*, int ),
     void (*audio_config)(),
-    void (*audio_palydata)(uint8_t * , int)){
+    void (*audio_palydata)(uint8_t * , int),
+    void (*playovertmp)()){
 
     host_playvideo = video_playdata;
     host_playaudio = audio_palydata;
+    playover = playovertmp;
 
     AVFormatContext *avInputFormatContext;
     avInputFormatContext = avformat_alloc_context();
@@ -279,7 +290,7 @@ void demuxing_main(char* filePath,
 
     int packetNum = 0;
 
-    for (;;)
+    while (!quietDemuxing)
     {
         ret = av_read_frame(avInputFormatContext, &packet);
         packetNum ++ ;
@@ -287,6 +298,7 @@ void demuxing_main(char* filePath,
         if (ret != 0)
         {
             printf("av_read_fram to the end \n");
+            decodeOver = 1;
             break;
         }
     
@@ -315,4 +327,12 @@ void demuxing_main(char* filePath,
 
         av_packet_unref(&packet);
     }
+}
+
+
+/**
+ * 关闭解码
+ */
+void closeDemuxing(){
+    quietDemuxing = 1;
 }
