@@ -17,4 +17,6 @@ void demuxing_main(char* filePath,
 
 void closeDemuxing();
 
+void seekVideo(int time);
+
 #endif

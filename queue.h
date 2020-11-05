@@ -57,7 +57,9 @@ QueueAudio* initQueueAuduio();
 
 QueueVideo* initVideoQueue();
 
+void clearAudioCache();
 
+void clearVideoCache();
 
 extern QueueAudio *maudioQueues; 
 

@@ -93,7 +93,7 @@ static void dispatchKeyEvent(SDL_Event *event){
 	if (event->key.keysym.sym == SDLK_RIGHT)
 	{
 		fprintf(stderr, "press key event : ---- %d  right \n");
-
+		seekVideo(5);
 	}
 	
 }

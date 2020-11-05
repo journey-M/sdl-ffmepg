@@ -17,6 +17,7 @@ static AVRational time_base_audio;
 static long lastTime;
 static int quietDemuxing = 0;
 static int decodeOver = 0;
+static int toSeek = 0; 
 
 /**
  * 视频播放剩余的进度
@@ -185,6 +186,14 @@ static void mvideo_playdata(AVFrame *avFrame){
     // host_playvideo(yplan, ypitch,uplan,upitch, vplan,vpi                currentAudioTime();                currentAudioTime();tch );   
 }
 
+/**
+ * 清空缓存的栈
+ */
+static void clearCache(){
+    toSeek = 0;
+    clearAudioCache();
+    clearVideoCache();   
+}
 
 void demuxing_main(char* filePath, 
     void (*video_playdata)(uint8_t*, int , uint8_t*, int ,uint8_t*, int ),
@@ -292,6 +301,18 @@ void demuxing_main(char* filePath,
 
     while (!quietDemuxing)
     {
+        if (toSeek == 1)
+        {
+            /* code */
+            int delay = audio_frame_time/1000000 + 5 ;
+            int64_t seekPos = delay / av_q2d(time_base_audio);
+            fprintf(stderr, "jump delay =  %d  %2d  \n", delay, seekPos);
+            
+            ret = av_seek_frame(avInputFormatContext, audioIndex, seekPos,AVSEEK_FLAG_BACKWARD);
+            if(ret >= 0){
+                clearCache();
+            }
+        }
         ret = av_read_frame(avInputFormatContext, &packet);
         packetNum ++ ;
 
@@ -335,4 +356,12 @@ void demuxing_main(char* filePath,
  */
 void closeDemuxing(){
     quietDemuxing = 1;
+}
+
+/**
+ * 调整进度
+ */
+
+void seekVideo(int time){
+    toSeek = 1;
 }

@@ -1,10 +1,15 @@
+#include <pthread.h>
 #include "queue.h"
 
 QueueAudio *maudioQueues; 
+pthread_mutex_t audioMutex;
 
 QueueVideo *mvideioQueues;
+pthread_mutex_t videoMutext;
 
 void putAudioData(AudioData *audioData){
+    pthread_mutex_lock(&audioMutex);
+
     if (audioData != NULL)
     {
         if (maudioQueues->size == 0)
@@ -22,10 +27,11 @@ void putAudioData(AudioData *audioData){
         }
 
     }
-
+    pthread_mutex_unlock(&audioMutex);
 }
 
 void putVideoData(VideoData *videoData){
+    pthread_mutex_lock(&videoMutext);
     if (videoData != NULL)
     {
         if (mvideioQueues->size == 0)
@@ -39,44 +45,54 @@ void putVideoData(VideoData *videoData){
             VideoData * last = mvideioQueues->last;
             last->next = videoData;
             mvideioQueues->last = videoData;
-            mvideioQueues->size = maudioQueues->size + 1;
+            mvideioQueues->size = mvideioQueues->size + 1;
         }
     }
+    pthread_mutex_unlock(&videoMutext);
 }
 
 AudioData* popFirstAudio(){
+    pthread_mutex_lock(&audioMutex);
+
+    AudioData *tmpData = NULL;
     if (maudioQueues->size == 0)
     {
         /* code */
-        return NULL;
+        tmpData = NULL;
     }else
     {
-        AudioData* ret = maudioQueues->first;
-        AudioData* next = ret->next;
+        tmpData = maudioQueues->first;
+        AudioData* next = tmpData->next;
         maudioQueues->first = next;
         maudioQueues->size = maudioQueues->size - 1;
-        return ret;
     }
+    pthread_mutex_unlock(&audioMutex);
+
+    return tmpData;
 }
 
 VideoData* popFirstVideo(){
+    pthread_mutex_lock(&videoMutext);
+
+    VideoData * tmpData;
     if (mvideioQueues->size == 0)
     {
         /* code */
-        return NULL;
+        tmpData = NULL;
     }else
     {
-        VideoData* ret = mvideioQueues->first;
-        if (ret == NULL)
+        tmpData = mvideioQueues->first;
+        if (tmpData)
         {
-            return NULL;
+            VideoData* next = tmpData->next;
+            mvideioQueues->first = next;
+            mvideioQueues->size = mvideioQueues->size - 1;
         }
-        
-        VideoData* next = ret->next;
-        mvideioQueues->first = next;
-        mvideioQueues->size = mvideioQueues->size - 1;
-        return ret;
+
     }
+    pthread_mutex_unlock(&videoMutext);
+
+    return tmpData;
 }
 
 int getVideoQueueSize(){
@@ -89,9 +105,56 @@ int getAudioQueueSize(){
 
 QueueAudio* initQueueAuduio(){
     maudioQueues = malloc(sizeof(QueueAudio));
+    maudioQueues->size = 0;
+    maudioQueues->first = NULL;
+    maudioQueues->last = NULL;
+    pthread_mutex_init(&audioMutex, NULL);
 
 }
 
 QueueVideo* initVideoQueue(){
     mvideioQueues = malloc(sizeof(QueueVideo));
+    mvideioQueues->size = 0;
+    mvideioQueues->first = NULL;
+    mvideioQueues->last = NULL;
+    pthread_mutex_init(&videoMutext, NULL);
+
+}
+
+
+
+void clearAudioCache(){
+    pthread_mutex_lock(&audioMutex);
+    while (maudioQueues->size >0)
+    {
+        AudioData* ret = maudioQueues->first;
+        maudioQueues->first = ret->next;
+        maudioQueues->size = maudioQueues->size -1;
+        av_frame_unref(ret->frame);
+        free(ret);
+    }
+    pthread_mutex_unlock(&audioMutex);
+}
+
+/**
+ * 清空缓存中的视频数据
+ */
+
+void clearVideoCache(){
+    pthread_mutex_lock(&videoMutext);
+
+    while (mvideioQueues->size >0)
+    {
+        VideoData* ret = mvideioQueues->first;
+        if (ret)
+        {
+            mvideioQueues->first = ret->next;
+            mvideioQueues->size = mvideioQueues->size -1;
+            av_frame_unref(ret->frame);
+            free(ret);
+        }
+        
+
+    }
+    pthread_mutex_unlock(&videoMutext);
 }
