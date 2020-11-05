@@ -12,7 +12,7 @@
 
 static AVPacket packet ;
 static pthread_t videoThread, audioThread;
-static AVRational time_base;
+static AVRational time_base_video;
 static AVRational time_base_audio;
 static long lastTime;
 static int quietDemuxing = 0;
@@ -24,6 +24,7 @@ static int toSeek = 0;
  */
 
 static double audio_frame_time ;
+static double video_frame_time;
 
 static void (*host_playvideo)(uint8_t*, int , uint8_t*, int ,uint8_t*, int );
 
@@ -47,16 +48,22 @@ static void videoDecoderTh(){
             if (vData != NULL)
             {
                 //当前帧应该在的时间
-                long  vtime = vData->frame->pts * av_q2d(time_base) * 1000000;
+                video_frame_time = vData->frame->pts * av_q2d(time_base_video) * 1000000;
 
 
-                int delt = vtime - audio_frame_time;
+                int delt = video_frame_time - audio_frame_time;
                 if (delt > 20)
                 {
                     // fprintf(stderr, "sleeping ....\nvtime: %f, \natime: %f   delt = %d  \n",vtime, audio_frame_time,delt);
                     av_usleep(delt);
+                }else if (delt < -100)
+                {
+                    //视频帧落后太多，则丢弃
+                    av_frame_unref(vData->frame);
+                    free(vData);
+                    continue;
                 }
-                
+                           
                 AVFrame * avFrame = vData->frame;
 
                 if (!swsContext)
@@ -277,7 +284,7 @@ void demuxing_main(char* filePath,
     fprintf(stderr, "time base : %f \n", av_q2d(videoStream -> time_base) );
     fprintf(stderr, "avg frame rate : %f \n", av_q2d(videoStream -> r_frame_rate) );
     fprintf(stderr, "avg frame rate : %f \n", av_q2d(videoStream -> r_frame_rate) );
-    time_base = videoStream->time_base;
+    time_base_video = videoStream->time_base;
 
     if (ret !=0)
     {
@@ -304,11 +311,11 @@ void demuxing_main(char* filePath,
         if (toSeek == 1)
         {
             /* code */
-            int delay = audio_frame_time/1000000 + 5 ;
-            int64_t seekPos = delay / av_q2d(time_base_audio);
+            int delay = video_frame_time/1000000 + 5 ;
+            int64_t seekPos = delay / av_q2d(time_base_video);
             fprintf(stderr, "jump delay =  %d  %2d  \n", delay, seekPos);
             
-            ret = av_seek_frame(avInputFormatContext, audioIndex, seekPos,AVSEEK_FLAG_BACKWARD);
+            ret = av_seek_frame(avInputFormatContext, videoIndex, seekPos, AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
             if(ret >= 0){
                 clearCache();
             }
