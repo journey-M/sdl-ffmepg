@@ -29,6 +29,19 @@
         "condition_variable": "c",
         "*.def": "c",
         "*.tcc": "cpp",
-        "avcodec.h": "c"
+        "avcodec.h": "c",
+        "deque": "c",
+        "forward_list": "c",
+        "list": "c",
+        "vector": "c",
+        "memory": "c",
+        "istream": "c",
+        "functional": "c",
+        "tuple": "c",
+        "bit": "c",
+        "memory_resource": "c",
+        "optional": "c",
+        "mutex": "c",
+        "ratio": "c"
     }
 }

@@ -19,11 +19,15 @@ static int quietDemuxing = 0;
 static int decodeOver = 0;
 static int toSeek = 0; 
 
+pthread_cond_t videoCond;
+pthread_mutex_t vFrameMutex;
+AVFrame * showingFrame = NULL;
+
 /**
  * 视频播放剩余的进度
  */
 
-static double audio_frame_time ;
+static double volatile audio_frame_time ;
 static double video_frame_time;
 
 static void (*host_playvideo)(uint8_t*, int , uint8_t*, int ,uint8_t*, int );
@@ -32,7 +36,6 @@ static void (*host_playaudio)(uint8_t * , int);
 
 static void (*playover)();
 
-struct swsContext* swsContext;
 
 /** 解码视频的线程
  */
@@ -43,61 +46,54 @@ static void videoDecoderTh(){
 
         if (getVideoQueueSize()>0)
         {
+            AVFrame *avFrame;
             /* code */
-            VideoData* vData = popFirstVideo();
-            if (vData != NULL)
+            getTop:
+            avFrame = popFirstVideo();
+            if (getVideoQueueSize() <= MIN_VIDEO_SIZE)
+            {
+                pthread_cond_signal(&videoCond);
+            }
+            
+            if (avFrame != NULL)
             {
                 //当前帧应该在的时间
-                video_frame_time = vData->frame->pts * av_q2d(time_base_video) * 1000000;
+                video_frame_time = avFrame->pts * av_q2d(time_base_video) * 1000000;
 
 
-                int delt = video_frame_time - audio_frame_time;
-                if (delt > 20)
-                {
-                    // fprintf(stderr, "sleeping ....\nvtime: %f, \natime: %f   delt = %d  \n",vtime, audio_frame_time,delt);
-                    av_usleep(delt);
-                }else if (delt < -100)
-                {
-                    //视频帧落后太多，则丢弃
-                    av_frame_unref(vData->frame);
-                    free(vData);
-                    continue;
-                }
-                           
-                AVFrame * avFrame = vData->frame;
+                int delt; 
+                while(delt = video_frame_time - audio_frame_time){
+                    if (quietDemuxing)
+                    {
+                        /* code */
+                        return;
+                    }
+                    
+                    if (delt < -10 * 1000)
+                    {
+                        //视频帧落后太多，则丢弃
+                        // goto getTop;
+                        break;
+                    }
+                    if (delt > 20 * 1000)
+                    {
+                        fprintf(stderr, "sleeping .... \natime: %f   delt = %d  \n", audio_frame_time,delt);
+                        av_usleep(10 * 1000);
+                        continue;
+                    }else
+                    {
+                        break;
+                    }
+                    
+                };
 
-                if (!swsContext)
-                {
-                    swsContext = sws_getContext(avFrame->width,  avFrame->height, avFrame->format, 
-                                avFrame->width/4, avFrame->height/4, avFrame->format,
-                                SWS_BILINEAR, NULL, NULL, NULL);
-                }
 
-                // uint8_t* pixels[4];
-                // int pitch[4];
-                // if ((av_image_alloc(pixels, pitch, avFrame->width/4, avFrame->height/4,
-                //    avFrame->format, 16)) < 0) {
-                //     fprintf(stderr, "Could not allocate destination image\n");
-                // }
-                AVFrame* destFrame = av_frame_alloc();
-                destFrame->format = vData->frame->format;
-                destFrame->width  = vData->frame->width;
-                destFrame->height = vData->frame->height;
+                host_playvideo(avFrame->data[0], avFrame->linesize[0], 
+                    avFrame->data[1], avFrame->linesize[1], 
+                    avFrame->data[2], avFrame->linesize[2]);
 
-                av_frame_get_buffer(destFrame, 32);
-
-                sws_scale(swsContext , avFrame->data, avFrame->linesize, 0, avFrame->height, 
-                    destFrame->data, destFrame->linesize);
-
-                /* buffer is going to be written to rawvideo file, no alignment */
-
-                host_playvideo(destFrame->data[0], destFrame->linesize[0], 
-                    destFrame->data[1], destFrame->linesize[1], 
-                    destFrame->data[2], destFrame->linesize[2]);
-                
-                av_frame_unref(destFrame);
-                av_frame_unref(vData->frame);
-                free(vData);
+                av_frame_unref(avFrame);
+                av_frame_free(avFrame);
             }
 
         }        
@@ -125,6 +121,7 @@ static void audioDecoderTh(){
                 size_t size = frame->nb_samples * av_get_bytes_per_sample(frame->format) * frame->channels;
                 host_playaudio(frame->data[0], size);
                 av_frame_unref(frame);
+                av_frame_free(&frame);
                 free(aData);
             }
  
@@ -133,6 +130,7 @@ static void audioDecoderTh(){
         if (decodeOver && getAudioQueueSize() == 0 && playover)
         {
             playover();
+            closeDemuxing();
         }
     }
     
@@ -160,10 +158,9 @@ static void mvideo_playdata(AVFrame *avFrame){
 
     // avFrame->opaque
 
-    int ret = 0;
 
-    AVFrame *copyFrame;
-    copyFrame = av_frame_alloc();
+    // AVFrame *copyFrame;
+    // copyFrame = av_frame_alloc();
     // copyFrame->format = avFrame->format;
     // copyFrame->width = avFrame->width;
     // copyFrame->height = avFrame->height;
@@ -174,21 +171,24 @@ static void mvideo_playdata(AVFrame *avFrame){
     // ret = av_frame_copy(copyFrame, avFrame);
     // av_frame_copy_props(copyFrame, avFrame);
 
-    av_frame_move_ref(copyFrame, avFrame);
+    // av_frame_move_ref(copyFrame, avFrame);
 
-    if (ret<0)
-    {
-        fprintf(stderr, "avframe copy error ! \n");
-        return ;
-    }
     
     //视频数据放入单独的队列中
-    VideoData* vidoeData = malloc(sizeof(VideoData));
-    vidoeData->frame = copyFrame;
-    vidoeData->next = NULL;
 
-    putVideoData(vidoeData);
+    if (getVideoQueueSize() >= MAX_VIDEO_SIZE-2)
+    {
+        pthread_mutex_lock(&vFrameMutex);
+        fprintf(stderr, "----------------wait    ing...... \n");
+        pthread_cond_wait(&videoCond, &vFrameMutex);
+        pthread_mutex_unlock(&vFrameMutex);
+        fprintf(stderr, "----------------wait    ing......    over  ..... \n");
+    }
+    
+    putVideoData(avFrame);
 
+    av_frame_unref(avFrame);
+    av_frame_free(avFrame);
     //直接返回播放
     // host_playvideo(yplan, ypitch,uplan,upitch, vplan,vpi                currentAudioTime();                currentAudioTime();tch );   
 }
@@ -291,6 +291,10 @@ void demuxing_main(char* filePath,
         printf("VideoDecoder init false ! \n");
         return;
     }
+    //视频锁
+    pthread_cond_init(&videoCond, NULL);
+    pthread_mutex_init(&vFrameMutex, NULL);
+
     
     //创建音频解码器
     AudioDecoder * audioDecoder = malloc(sizeof(AudioDecoder));
